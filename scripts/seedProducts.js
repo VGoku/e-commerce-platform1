@@ -1,9 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
+
+// Load environment variables
+dotenv.config()
 
 const supabaseUrl = 'https://jqhgqhgsgczaigagjiur.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxaGdxaGdzZ2N6YWlnYWdqaXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc2NjU4MzgsImV4cCI6MjA1MzI0MTgzOH0.b_skL62L0XuYfetX4mtddE3fr0_iCsPztOsFYXMLGq8'
+// Use service role key instead of anon key
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+if (!supabaseServiceKey) {
+    console.error('Error: SUPABASE_SERVICE_ROLE_KEY is not set in .env file')
+    process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+})
 
 const sampleProducts = [
     {
@@ -51,18 +66,6 @@ const sampleProducts = [
 async function seedProducts() {
     console.log('Starting to seed products...')
 
-    // First, sign in with your admin account
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: 'your-admin-email@example.com',  // Replace with your admin email
-        password: 'your-admin-password'         // Replace with your admin password
-    })
-
-    if (signInError) {
-        console.error('Error signing in:', signInError.message)
-        return
-    }
-
-    // Now seed the products
     for (const product of sampleProducts) {
         try {
             const { data, error } = await supabase
@@ -81,9 +84,6 @@ async function seedProducts() {
     }
 
     console.log('Finished seeding products')
-
-    // Sign out after seeding
-    await supabase.auth.signOut()
 }
 
 // Run the seeding function

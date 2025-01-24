@@ -1,28 +1,34 @@
-import { Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout'
-import Home from './pages/Home'
-import Products from './pages/Products'
-import ProductDetail from './pages/ProductDetail'
-import Cart from './pages/Cart'
-import Checkout from './pages/Checkout'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
+import { useEffect } from 'react'
+import { BrowserRouter } from 'react-router-dom'
+import Navigation from './components/Navigation'
+import AppRoutes from './routes'
+import { Toaster } from 'react-hot-toast'
+import useThemeStore from './stores/useThemeStore'
+import useAuthStore from './stores/useAuthStore'
 
 function App() {
+    const { theme } = useThemeStore()
+    const { initialize } = useAuthStore()
+
+    useEffect(() => {
+        // Initialize auth state
+        initialize()
+
+        // Apply theme class to html element
+        document.documentElement.classList.remove('light', 'dark')
+        document.documentElement.classList.add(theme)
+    }, [theme, initialize])
+
     return (
-        <Routes>
-            <Route path="/" element={<Layout />}>
-                <Route index element={<Home />} />
-                <Route path="products" element={<Products />} />
-                <Route path="products/:id" element={<ProductDetail />} />
-                <Route path="cart" element={<Cart />} />
-                <Route path="checkout" element={<Checkout />} />
-                <Route path="login" element={<Login />} />
-                <Route path="register" element={<Register />} />
-                <Route path="dashboard" element={<Dashboard />} />
-            </Route>
-        </Routes>
+        <BrowserRouter>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+                <Navigation />
+                <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+                    <AppRoutes />
+                </main>
+                <Toaster position="top-right" />
+            </div>
+        </BrowserRouter>
     )
 }
 

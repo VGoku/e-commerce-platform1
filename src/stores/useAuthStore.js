@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { signIn, signUp, signOut, getCurrentUser } from '../lib/supabase'
+import { supabase } from '../lib/supabaseClient'
 
 const useAuthStore = create(
     persist(
@@ -13,23 +13,36 @@ const useAuthStore = create(
             initialize: async () => {
                 set({ loading: true })
                 try {
-                    const { user, error } = await getCurrentUser()
+                    // Check for existing session
+                    const { data: { session }, error } = await supabase.auth.getSession()
                     if (error) throw error
-                    set({ user, error: null })
+
+                    if (session) {
+                        set({ user: session.user })
+                    }
+
+                    // Listen for auth changes
+                    supabase.auth.onAuthStateChange((_event, session) => {
+                        set({ user: session?.user || null })
+                    })
                 } catch (error) {
+                    console.error('Auth initialization error:', error)
                     set({ error: error.message })
                 } finally {
                     set({ loading: false })
                 }
             },
 
-            // Sign in
+            // Sign in with email
             signIn: async (email, password) => {
                 set({ loading: true, error: null })
                 try {
-                    const { data, error } = await signIn(email, password)
+                    const { data: { user }, error } = await supabase.auth.signInWithPassword({
+                        email,
+                        password
+                    })
                     if (error) throw error
-                    set({ user: data.user })
+                    set({ user })
                     return { success: true }
                 } catch (error) {
                     set({ error: error.message })
@@ -39,13 +52,33 @@ const useAuthStore = create(
                 }
             },
 
-            // Sign up
+            // Sign in with GitHub
+            signInWithGithub: async () => {
+                set({ loading: true, error: null })
+                try {
+                    const { error } = await supabase.auth.signInWithOAuth({
+                        provider: 'github'
+                    })
+                    if (error) throw error
+                    return { success: true }
+                } catch (error) {
+                    set({ error: error.message })
+                    return { success: false, error: error.message }
+                } finally {
+                    set({ loading: false })
+                }
+            },
+
+            // Sign up with email
             signUp: async (email, password) => {
                 set({ loading: true, error: null })
                 try {
-                    const { data, error } = await signUp(email, password)
+                    const { data: { user }, error } = await supabase.auth.signUp({
+                        email,
+                        password
+                    })
                     if (error) throw error
-                    set({ user: data.user })
+                    set({ user })
                     return { success: true }
                 } catch (error) {
                     set({ error: error.message })
@@ -59,7 +92,7 @@ const useAuthStore = create(
             signOut: async () => {
                 set({ loading: true, error: null })
                 try {
-                    const { error } = await signOut()
+                    const { error } = await supabase.auth.signOut()
                     if (error) throw error
                     set({ user: null })
                     return { success: true }
@@ -76,6 +109,7 @@ const useAuthStore = create(
         }),
         {
             name: 'auth-storage',
+            partialize: (state) => ({ user: state.user })
         }
     )
 )
