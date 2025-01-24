@@ -1,21 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-
-const products = [
-    {
-        id: 1,
-        name: 'Basic Tee',
-        href: '/products/1',
-        price: '$35',
-        description: 'Look like a visionary CEO and wear the same black t-shirt every day.',
-        imageSrc: '#',
-        imageAlt: 'Black t-shirt.',
-    },
-    // Add more products here
-]
+import useProductStore from '../stores/useProductStore'
 
 export default function Products() {
     const [sortBy, setSortBy] = useState('newest')
+    const { products, loading, error, fetchProducts } = useProductStore()
+
+    useEffect(() => {
+        fetchProducts()
+    }, [fetchProducts])
+
+    const getSortedProducts = () => {
+        switch (sortBy) {
+            case 'price-low':
+                return [...products].sort((a, b) => a.price - b.price)
+            case 'price-high':
+                return [...products].sort((a, b) => b.price - a.price)
+            case 'newest':
+            default:
+                return products
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg text-gray-600">Loading products...</div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg text-red-600">Error: {error}</div>
+            </div>
+        )
+    }
 
     return (
         <div className="bg-white">
@@ -59,7 +80,12 @@ export default function Products() {
                                     </li>
                                     <li>
                                         <a href="#" className="hover:text-primary-600">
-                                            Accessories
+                                            Electronics
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" className="hover:text-primary-600">
+                                            Jewelry
                                         </a>
                                     </li>
                                 </ul>
@@ -68,13 +94,17 @@ export default function Products() {
                             {/* Product grid */}
                             <div className="lg:col-span-3">
                                 <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-8">
-                                    {products.map((product) => (
-                                        <Link key={product.id} to={product.href} className="group">
+                                    {getSortedProducts().map((product) => (
+                                        <Link key={product.id} to={`/products/${product.id}`} className="group">
                                             <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200">
-                                                <div className="h-full w-full bg-gray-200 group-hover:opacity-75" />
+                                                <img
+                                                    src={product.image}
+                                                    alt={product.title}
+                                                    className="h-full w-full object-cover object-center group-hover:opacity-75"
+                                                />
                                             </div>
-                                            <h3 className="mt-4 text-sm text-gray-700">{product.name}</h3>
-                                            <p className="mt-1 text-lg font-medium text-gray-900">{product.price}</p>
+                                            <h3 className="mt-4 text-sm text-gray-700">{product.title}</h3>
+                                            <p className="mt-1 text-lg font-medium text-gray-900">${product.price.toFixed(2)}</p>
                                         </Link>
                                     ))}
                                 </div>

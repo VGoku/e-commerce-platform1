@@ -1,31 +1,9 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { StarIcon } from '@heroicons/react/20/solid'
-
-const product = {
-    name: 'Basic Tee',
-    price: '$35',
-    rating: 4,
-    images: [
-        {
-            id: 1,
-            src: '#',
-            alt: 'Product image',
-        },
-    ],
-    colors: [
-        { name: 'Black', value: '#000000' },
-        { name: 'Gray', value: '#808080' },
-    ],
-    sizes: [
-        { name: 'XS', inStock: true },
-        { name: 'S', inStock: true },
-        { name: 'M', inStock: true },
-        { name: 'L', inStock: true },
-        { name: 'XL', inStock: true },
-    ],
-    description: 'Look like a visionary CEO and wear the same black t-shirt every day.',
-}
+import useProductStore from '../stores/useProductStore'
+import useCartStore from '../stores/useCartStore'
+import toast from 'react-hot-toast'
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -33,8 +11,49 @@ function classNames(...classes) {
 
 export default function ProductDetail() {
     const { id } = useParams()
-    const [selectedColor, setSelectedColor] = useState(product.colors[0])
-    const [selectedSize, setSelectedSize] = useState(product.sizes[2])
+    const navigate = useNavigate()
+    const { products, loading, error, fetchProducts } = useProductStore()
+    const addItem = useCartStore((state) => state.addItem)
+    const [selectedQuantity, setSelectedQuantity] = useState(1)
+
+    useEffect(() => {
+        if (products.length === 0) {
+            fetchProducts()
+        }
+    }, [fetchProducts, products.length])
+
+    const handleAddToCart = (e) => {
+        e.preventDefault()
+        addItem(product, selectedQuantity)
+        toast.success('Added to cart!')
+        navigate('/cart')
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg text-gray-600">Loading product details...</div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg text-red-600">Error: {error}</div>
+            </div>
+        )
+    }
+
+    const product = products.find(p => p.id === parseInt(id))
+
+    if (!product) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg text-gray-600">Product not found</div>
+            </div>
+        )
+    }
 
     return (
         <div className="bg-white">
@@ -43,17 +62,21 @@ export default function ProductDetail() {
                     {/* Image gallery */}
                     <div className="flex flex-col-reverse">
                         <div className="aspect-h-1 aspect-w-1 w-full">
-                            <div className="h-full w-full bg-gray-200" />
+                            <img
+                                src={product.image}
+                                alt={product.title}
+                                className="h-full w-full object-contain object-center"
+                            />
                         </div>
                     </div>
 
                     {/* Product info */}
                     <div className="mt-10 px-4 sm:mt-16 sm:px-0 lg:mt-0">
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">{product.name}</h1>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">{product.title}</h1>
 
                         <div className="mt-3">
                             <h2 className="sr-only">Product information</h2>
-                            <p className="text-3xl tracking-tight text-gray-900">{product.price}</p>
+                            <p className="text-3xl tracking-tight text-gray-900">${product.price.toFixed(2)}</p>
                         </div>
 
                         {/* Reviews */}
@@ -65,14 +88,16 @@ export default function ProductDetail() {
                                         <StarIcon
                                             key={rating}
                                             className={classNames(
-                                                product.rating > rating ? 'text-yellow-400' : 'text-gray-300',
+                                                product.rating?.rate > rating ? 'text-yellow-400' : 'text-gray-300',
                                                 'h-5 w-5 flex-shrink-0'
                                             )}
                                             aria-hidden="true"
                                         />
                                     ))}
                                 </div>
-                                <p className="sr-only">{product.rating} out of 5 stars</p>
+                                <p className="ml-2 text-sm text-gray-500">
+                                    {product.rating?.rate} ({product.rating?.count} reviews)
+                                </p>
                             </div>
                         </div>
 
@@ -81,54 +106,25 @@ export default function ProductDetail() {
                             <p className="text-base text-gray-900">{product.description}</p>
                         </div>
 
-                        <form className="mt-6">
-                            {/* Colors */}
-                            <div>
-                                <h3 className="text-sm font-medium text-gray-900">Color</h3>
-                                <div className="mt-2">
-                                    <div className="flex items-center space-x-3">
-                                        {product.colors.map((color) => (
-                                            <button
-                                                key={color.name}
-                                                type="button"
-                                                className={classNames(
-                                                    color.value === selectedColor.value ? 'ring-2 ring-primary-500' : '',
-                                                    'relative h-8 w-8 rounded-full border border-black border-opacity-10'
-                                                )}
-                                                style={{ backgroundColor: color.value }}
-                                                onClick={() => setSelectedColor(color)}
-                                            >
-                                                <span className="sr-only">{color.name}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sizes */}
+                        <form className="mt-6" onSubmit={handleAddToCart}>
+                            {/* Quantity */}
                             <div className="mt-8">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-medium text-gray-900">Size</h3>
+                                    <h3 className="text-sm font-medium text-gray-900">Quantity</h3>
                                 </div>
 
                                 <div className="mt-2">
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {product.sizes.map((size) => (
-                                            <button
-                                                key={size.name}
-                                                type="button"
-                                                className={classNames(
-                                                    size.name === selectedSize.name
-                                                        ? 'border-primary-500 ring-2 ring-primary-500'
-                                                        : 'border-gray-300',
-                                                    'flex items-center justify-center rounded-md border py-2 text-sm font-medium uppercase hover:bg-gray-50'
-                                                )}
-                                                onClick={() => setSelectedSize(size)}
-                                            >
-                                                {size.name}
-                                            </button>
+                                    <select
+                                        value={selectedQuantity}
+                                        onChange={(e) => setSelectedQuantity(parseInt(e.target.value))}
+                                        className="input max-w-[100px]"
+                                    >
+                                        {[1, 2, 3, 4, 5].map((num) => (
+                                            <option key={num} value={num}>
+                                                {num}
+                                            </option>
                                         ))}
-                                    </div>
+                                    </select>
                                 </div>
                             </div>
 

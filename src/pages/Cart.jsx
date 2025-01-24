@@ -1,25 +1,32 @@
 import { Link } from 'react-router-dom'
 import { TrashIcon } from '@heroicons/react/24/outline'
-
-const cart = {
-    items: [
-        {
-            id: 1,
-            name: 'Basic Tee',
-            href: '/products/1',
-            price: '$35.00',
-            color: 'Black',
-            size: 'Large',
-            quantity: 1,
-        },
-    ],
-}
+import useCartStore from '../stores/useCartStore'
 
 export default function Cart() {
-    const subtotal = cart.items.reduce((total, item) => total + parseFloat(item.price.replace('$', '')) * item.quantity, 0)
-    const shipping = 5.00
+    const { items, removeItem, updateQuantity, getTotal } = useCartStore()
+
+    const subtotal = getTotal()
+    const shipping = items.length > 0 ? 5.00 : 0
     const tax = subtotal * 0.1
     const total = subtotal + shipping + tax
+
+    if (items.length === 0) {
+        return (
+            <div className="bg-white">
+                <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24 lg:max-w-7xl lg:px-8">
+                    <div className="text-center">
+                        <h2 className="text-3xl font-bold tracking-tight text-gray-900">Your cart is empty</h2>
+                        <p className="mt-4 text-gray-500">Start shopping to add items to your cart.</p>
+                        <div className="mt-6">
+                            <Link to="/products" className="btn btn-primary">
+                                Browse Products
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="bg-white">
@@ -31,24 +38,30 @@ export default function Cart() {
                         <h2 className="sr-only">Items in your shopping cart</h2>
 
                         <ul className="divide-y divide-gray-200 border-b border-t border-gray-200">
-                            {cart.items.map((item) => (
+                            {items.map((item) => (
                                 <li key={item.id} className="flex py-6">
                                     <div className="flex-shrink-0">
-                                        <div className="h-24 w-24 rounded-md border border-gray-200 bg-gray-200" />
+                                        <img
+                                            src={item.image}
+                                            alt={item.title}
+                                            className="h-24 w-24 rounded-md object-contain object-center"
+                                        />
                                     </div>
 
                                     <div className="ml-4 flex flex-1 flex-col sm:ml-6">
                                         <div>
                                             <div className="flex justify-between">
                                                 <h4 className="text-sm">
-                                                    <Link to={item.href} className="font-medium text-gray-700 hover:text-gray-800">
-                                                        {item.name}
+                                                    <Link to={`/products/${item.id}`} className="font-medium text-gray-700 hover:text-gray-800">
+                                                        {item.title}
                                                     </Link>
                                                 </h4>
-                                                <p className="ml-4 text-sm font-medium text-gray-900">{item.price}</p>
+                                                <p className="ml-4 text-sm font-medium text-gray-900">
+                                                    ${(item.price * item.quantity).toFixed(2)}
+                                                </p>
                                             </div>
                                             <p className="mt-1 text-sm text-gray-500">
-                                                {item.color} / {item.size}
+                                                ${item.price.toFixed(2)} each
                                             </p>
                                         </div>
 
@@ -62,14 +75,19 @@ export default function Cart() {
                                                     name={`quantity-${item.id}`}
                                                     className="input max-w-[80px]"
                                                     value={item.quantity}
+                                                    onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
                                                 >
-                                                    <option value={1}>1</option>
-                                                    <option value={2}>2</option>
-                                                    <option value={3}>3</option>
-                                                    <option value={4}>4</option>
-                                                    <option value={5}>5</option>
+                                                    {[1, 2, 3, 4, 5].map((num) => (
+                                                        <option key={num} value={num}>
+                                                            {num}
+                                                        </option>
+                                                    ))}
                                                 </select>
-                                                <button type="button" className="text-gray-500 hover:text-gray-600">
+                                                <button
+                                                    type="button"
+                                                    className="text-gray-500 hover:text-gray-600"
+                                                    onClick={() => removeItem(item.id)}
+                                                >
                                                     <TrashIcon className="h-5 w-5" />
                                                 </button>
                                             </div>
