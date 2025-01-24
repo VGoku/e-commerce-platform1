@@ -1,13 +1,36 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import useAuthStore from '../stores/useAuthStore'
+import toast from 'react-hot-toast'
 
 export default function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const navigate = useNavigate()
+    const { signIn, user, error, loading, clearError } = useAuthStore()
+
+    useEffect(() => {
+        // If user is already logged in, redirect to home
+        if (user) {
+            navigate('/')
+        }
+    }, [user, navigate])
+
+    useEffect(() => {
+        // Show error message if there is one
+        if (error) {
+            toast.error(error)
+            clearError()
+        }
+    }, [error, clearError])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        // TODO: Implement login with Supabase
+        const result = await signIn(email, password)
+        if (result.success) {
+            toast.success('Successfully logged in!')
+            navigate('/')
+        }
     }
 
     return (
@@ -44,9 +67,9 @@ export default function Login() {
                                 Password
                             </label>
                             <div className="text-sm">
-                                <a href="#" className="font-semibold text-primary-600 hover:text-primary-500">
+                                <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-500">
                                     Forgot password?
-                                </a>
+                                </Link>
                             </div>
                         </div>
                         <div className="mt-2">
@@ -67,8 +90,9 @@ export default function Login() {
                         <button
                             type="submit"
                             className="btn btn-primary w-full"
+                            disabled={loading}
                         >
-                            Sign in
+                            {loading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </div>
                 </form>

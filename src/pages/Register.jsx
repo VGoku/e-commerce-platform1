@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import useAuthStore from '../stores/useAuthStore'
+import toast from 'react-hot-toast'
 
 export default function Register() {
     const [formData, setFormData] = useState({
@@ -7,10 +9,37 @@ export default function Register() {
         password: '',
         confirmPassword: '',
     })
+    const navigate = useNavigate()
+    const { signUp, user, error, loading, clearError } = useAuthStore()
+
+    useEffect(() => {
+        // If user is already logged in, redirect to home
+        if (user) {
+            navigate('/')
+        }
+    }, [user, navigate])
+
+    useEffect(() => {
+        // Show error message if there is one
+        if (error) {
+            toast.error(error)
+            clearError()
+        }
+    }, [error, clearError])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        // TODO: Implement registration with Supabase
+
+        if (formData.password !== formData.confirmPassword) {
+            toast.error('Passwords do not match')
+            return
+        }
+
+        const result = await signUp(formData.email, formData.password)
+        if (result.success) {
+            toast.success('Successfully registered! Please check your email to confirm your account.')
+            navigate('/login')
+        }
     }
 
     const handleChange = (e) => {
@@ -89,8 +118,9 @@ export default function Register() {
                         <button
                             type="submit"
                             className="btn btn-primary w-full"
+                            disabled={loading}
                         >
-                            Register
+                            {loading ? 'Creating account...' : 'Register'}
                         </button>
                     </div>
                 </form>
