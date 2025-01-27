@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import useAuthStore from '../stores/useAuthStore'
 import toast from 'react-hot-toast'
 
 export default function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const navigate = useNavigate()
+    const location = useLocation()
     const { signIn, signInWithGithub, user, error, loading, clearError } = useAuthStore()
 
+    // Get the redirect path from location state or default to dashboard
+    const from = location.state?.from?.pathname || '/dashboard'
+
     useEffect(() => {
-        // If user is already logged in, redirect to home
+        // If user is already logged in, redirect to the intended destination
         if (user) {
-            navigate('/')
+            navigate(from, { replace: true })
         }
-    }, [user, navigate])
+    }, [user, navigate, from])
 
     useEffect(() => {
         // Show error message if there is one
@@ -26,16 +32,38 @@ export default function Login() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        // Basic validation
+        if (!email.trim()) {
+            toast.error('Email is required')
+            return
+        }
+        if (!password) {
+            toast.error('Password is required')
+            return
+        }
+
         const result = await signIn(email, password)
+        if (!result.success && result.error?.includes('confirm your email')) {
+            toast.error('Please check your email and click the confirmation link before signing in',
+                { duration: 5000 }
+            )
+            // Add a helpful message about resending confirmation
+            toast('If you need a new confirmation email, please register again with the same email',
+                { duration: 7000 }
+            )
+            return
+        }
+
         if (result.success) {
             toast.success('Successfully logged in!')
-            navigate('/')
+            navigate(from, { replace: true })
         }
     }
 
     const handleGithubLogin = async () => {
         await signInWithGithub()
-        // Note: No need to navigate here as the auth state change will trigger the useEffect
+        // Note: Auth state change will trigger the useEffect redirect
     }
 
     return (
@@ -62,6 +90,7 @@ export default function Login() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="input"
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -77,17 +106,30 @@ export default function Login() {
                                 </Link>
                             </div>
                         </div>
-                        <div className="mt-2">
+                        <div className="mt-2 relative">
                             <input
                                 id="password"
                                 name="password"
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 autoComplete="current-password"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="input"
+                                className="input pr-10"
+                                disabled={loading}
                             />
+                            <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                                onClick={() => setShowPassword(!showPassword)}
+                                disabled={loading}
+                            >
+                                {showPassword ? (
+                                    <EyeSlashIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                ) : (
+                                    <EyeIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                )}
+                            </button>
                         </div>
                     </div>
 

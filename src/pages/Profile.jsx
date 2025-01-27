@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { UserCircleIcon } from '@heroicons/react/24/outline'
 import useAuthStore from '../stores/useAuthStore'
+import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { getProfile, updateProfile } from '../lib/supabase'
 
 export default function Profile() {
-    const { user } = useAuthStore()
     const navigate = useNavigate()
-    const [loading, setLoading] = useState(false)
-    const [profile, setProfile] = useState({
-        full_name: '',
-        address: '',
-        city: '',
-        state: '',
-        postal_code: '',
-        phone: ''
+    const { user } = useAuthStore()
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [formData, setFormData] = useState({
+        username: user?.user_metadata?.username || '',
+        website: '',
+        avatar_url: ''
     })
 
     useEffect(() => {
@@ -22,161 +21,204 @@ export default function Profile() {
             navigate('/login')
             return
         }
-
-        // Fetch user profile
-        const fetchProfile = async () => {
-            setLoading(true)
-            try {
-                const { data, error } = await getProfile(user.id)
-                if (error) throw error
-                if (data) {
-                    setProfile(data)
-                }
-            } catch (error) {
-                toast.error('Error loading profile')
-                console.error('Error:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
         fetchProfile()
     }, [user, navigate])
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        setLoading(true)
-
+    async function fetchProfile() {
         try {
-            const { error } = await updateProfile(user.id, profile)
-            if (error) throw error
-            toast.success('Profile updated successfully')
+            setLoading(true)
+
+            // First, try to get the existing profile
+            let { data, error } = await supabase
+                .from('profiles')
+                .select('username, website, avatar_url')
+                .eq('id', user.id)
+                .maybeSingle()
+
+            if (error && error.code !== 'PGRST116') {
+                throw error
+            }
+
+            // If no profile exists, create one
+            if (!data) {
+                const newProfile = {
+                    id: user.id,
+                    username: user.user_metadata?.username || '',
+                    updated_at: new Date().toISOString()
+                }
+
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .insert([newProfile])
+
+                if (insertError) throw insertError
+
+                data = newProfile
+            }
+
+            // Update form data
+            setFormData({
+                username: data.username || user.user_metadata?.username || '',
+                website: data.website || '',
+                avatar_url: data.avatar_url || ''
+            })
         } catch (error) {
-            toast.error('Error updating profile')
-            console.error('Error:', error)
+            console.error('Error fetching profile:', error)
+            toast.error('Error loading profile')
         } finally {
             setLoading(false)
         }
     }
 
+    async function updateProfile() {
+        try {
+            setSaving(true)
+
+            // Validate username
+            if (!formData.username.trim()) {
+                toast.error('Username is required')
+                return
+            }
+
+            const updates = {
+                id: user.id,
+                username: formData.username.trim(),
+                website: formData.website.trim(),
+                avatar_url: formData.avatar_url,
+                updated_at: new Date().toISOString()
+            }
+
+            const { error } = await supabase
+                .from('profiles')
+                .upsert(updates, {
+                    returning: 'minimal'
+                })
+
+            if (error) throw error
+
+            // Update the username in auth metadata as well
+            const { error: metadataError } = await supabase.auth.updateUser({
+                data: { username: formData.username.trim() }
+            })
+
+            if (metadataError) throw metadataError
+
+            toast.success('Profile updated successfully!')
+        } catch (error) {
+            console.error('Error updating profile:', error)
+            toast.error(error.message || 'Error updating profile')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        await updateProfile()
+    }
+
     const handleChange = (e) => {
         const { name, value } = e.target
-        setProfile(prev => ({
+        setFormData(prev => ({
             ...prev,
             [name]: value
         }))
     }
 
+    if (!user) return null
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-[50vh]">
+            <div className="flex justify-center items-center min-h-[60vh]">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
             </div>
         )
     }
 
     return (
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">Profile Information</h3>
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-6">
-                        <div>
-                            <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Full Name
-                            </label>
-                            <input
-                                type="text"
-                                name="full_name"
-                                id="full_name"
-                                value={profile.full_name || ''}
-                                onChange={handleChange}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Address
-                            </label>
-                            <input
-                                type="text"
-                                name="address"
-                                id="address"
-                                value={profile.address || ''}
-                                onChange={handleChange}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-3">
+        <div className="py-6">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="overflow-hidden bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+                    <div className="px-4 py-5 sm:px-6">
+                        <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">Profile Settings</h3>
+                        <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                            Update your profile information
+                        </p>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700">
+                        <form onSubmit={handleSubmit} className="space-y-6 px-4 py-5 sm:p-6">
                             <div>
-                                <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    City
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Email
                                 </label>
-                                <input
-                                    type="text"
-                                    name="city"
-                                    id="city"
-                                    value={profile.city || ''}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                                />
+                                <div className="mt-1">
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        id="email"
+                                        className="input"
+                                        value={user.email}
+                                        disabled
+                                    />
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">Your email cannot be changed.</p>
                             </div>
 
                             <div>
-                                <label htmlFor="state" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    State
+                                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Username
                                 </label>
-                                <input
-                                    type="text"
-                                    name="state"
-                                    id="state"
-                                    value={profile.state || ''}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                                />
+                                <div className="mt-1">
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        id="username"
+                                        className="input"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        required
+                                        minLength={3}
+                                    />
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">This is your public display name.</p>
                             </div>
 
                             <div>
-                                <label htmlFor="postal_code" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Postal Code
+                                <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Website
                                 </label>
-                                <input
-                                    type="text"
-                                    name="postal_code"
-                                    id="postal_code"
-                                    value={profile.postal_code || ''}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                                />
+                                <div className="mt-1">
+                                    <input
+                                        type="url"
+                                        name="website"
+                                        id="website"
+                                        className="input"
+                                        value={formData.website}
+                                        onChange={handleChange}
+                                        placeholder="https://example.com"
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                name="phone"
-                                id="phone"
-                                value={profile.phone || ''}
-                                onChange={handleChange}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                            />
-                        </div>
-
-                        <div className="flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="btn btn-primary"
-                            >
-                                {loading ? 'Saving...' : 'Save Changes'}
-                            </button>
-                        </div>
-                    </form>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(-1)}
+                                    className="btn btn-secondary"
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    disabled={saving}
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

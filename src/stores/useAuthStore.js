@@ -13,7 +13,6 @@ const useAuthStore = create(
             initialize: async () => {
                 set({ loading: true })
                 try {
-                    // Check for existing session
                     const { data: { session }, error } = await supabase.auth.getSession()
                     if (error) throw error
 
@@ -22,9 +21,13 @@ const useAuthStore = create(
                     }
 
                     // Listen for auth changes
-                    supabase.auth.onAuthStateChange((_event, session) => {
+                    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
                         set({ user: session?.user || null })
                     })
+
+                    return () => {
+                        if (subscription) subscription.unsubscribe()
+                    }
                 } catch (error) {
                     console.error('Auth initialization error:', error)
                     set({ error: error.message })
@@ -37,16 +40,40 @@ const useAuthStore = create(
             signIn: async (email, password) => {
                 set({ loading: true, error: null })
                 try {
-                    const { data: { user }, error } = await supabase.auth.signInWithPassword({
-                        email,
+                    // Validate inputs
+                    if (!email || !password) {
+                        throw new Error('Email and password are required')
+                    }
+
+                    // Attempt to sign in
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: email.trim().toLowerCase(),
                         password
                     })
-                    if (error) throw error
-                    set({ user })
+
+                    if (error) {
+                        if (error.message.includes('Email not confirmed')) {
+                            throw new Error('Please check your email and confirm your account before signing in')
+                        }
+                        throw error
+                    }
+
+                    if (!data?.session) {
+                        throw new Error('No session returned after successful login')
+                    }
+
+                    set({ user: data.session.user })
                     return { success: true }
                 } catch (error) {
-                    set({ error: error.message })
-                    return { success: false, error: error.message }
+                    console.error('Sign in error:', error)
+                    let errorMessage = 'Failed to sign in'
+                    if (error.message.includes('Invalid login credentials')) {
+                        errorMessage = 'Invalid email or password'
+                    } else if (error.message.includes('Email not confirmed')) {
+                        errorMessage = 'Please confirm your email before signing in'
+                    }
+                    set({ error: errorMessage })
+                    return { success: false, error: errorMessage }
                 } finally {
                     set({ loading: false })
                 }
@@ -57,32 +84,78 @@ const useAuthStore = create(
                 set({ loading: true, error: null })
                 try {
                     const { error } = await supabase.auth.signInWithOAuth({
-                        provider: 'github'
+                        provider: 'github',
+                        options: {
+                            redirectTo: `${window.location.origin}/dashboard`
+                        }
                     })
                     if (error) throw error
                     return { success: true }
                 } catch (error) {
-                    set({ error: error.message })
-                    return { success: false, error: error.message }
+                    console.error('GitHub sign in error:', error)
+                    set({ error: 'Failed to sign in with GitHub' })
+                    return { success: false, error: 'Failed to sign in with GitHub' }
                 } finally {
                     set({ loading: false })
                 }
             },
 
             // Sign up with email
-            signUp: async (email, password) => {
+            signUp: async (email, password, username) => {
                 set({ loading: true, error: null })
                 try {
-                    const { data: { user }, error } = await supabase.auth.signUp({
-                        email,
-                        password
+                    // Validate inputs
+                    if (!email || !password || !username) {
+                        throw new Error('Email, password, and username are required')
+                    }
+
+                    const { data, error } = await supabase.auth.signUp({
+                        email: email.trim(),
+                        password,
+                        options: {
+                            data: {
+                                username: username.trim()
+                            },
+                            emailRedirectTo: `${window.location.origin}/login`
+                        }
                     })
+
                     if (error) throw error
-                    set({ user })
+
+                    // Check if email confirmation is required
+                    if (data?.user && !data?.session) {
+                        return {
+                            success: true,
+                            message: 'Please check your email for confirmation link'
+                        }
+                    }
+
+                    // If email confirmation is not required, create profile
+                    if (data?.user) {
+                        const { error: profileError } = await supabase
+                            .from('profiles')
+                            .upsert([
+                                {
+                                    id: data.user.id,
+                                    username: username.trim(),
+                                    updated_at: new Date().toISOString()
+                                }
+                            ])
+                        if (profileError) {
+                            console.error('Profile creation error:', profileError)
+                        }
+                        set({ user: data.user })
+                    }
+
                     return { success: true }
                 } catch (error) {
-                    set({ error: error.message })
-                    return { success: false, error: error.message }
+                    console.error('Sign up error:', error)
+                    let errorMessage = 'Failed to create account'
+                    if (error.message.includes('already registered')) {
+                        errorMessage = 'This email is already registered'
+                    }
+                    set({ error: errorMessage })
+                    return { success: false, error: errorMessage }
                 } finally {
                     set({ loading: false })
                 }
@@ -95,10 +168,10 @@ const useAuthStore = create(
                     const { error } = await supabase.auth.signOut()
                     if (error) throw error
                     set({ user: null })
-                    return { success: true }
+                    window.location.href = '/' // Redirect to home page
                 } catch (error) {
-                    set({ error: error.message })
-                    return { success: false, error: error.message }
+                    console.error('Sign out error:', error)
+                    set({ error: 'Failed to sign out' })
                 } finally {
                     set({ loading: false })
                 }
