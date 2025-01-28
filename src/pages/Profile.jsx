@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline'
 import useAuthStore from '../stores/useAuthStore'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
@@ -10,10 +10,13 @@ export default function Profile() {
     const { user } = useAuthStore()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef(null)
     const [formData, setFormData] = useState({
+        full_name: '',
         username: user?.user_metadata?.username || '',
-        website: '',
-        avatar_url: ''
+        avatar_url: '',
+        bio: ''
     })
 
     useEffect(() => {
@@ -31,42 +34,63 @@ export default function Profile() {
             // First, try to get the existing profile
             let { data, error } = await supabase
                 .from('profiles')
-                .select('username, website, avatar_url')
+                .select('full_name, username, avatar_url, bio')
                 .eq('id', user.id)
-                .maybeSingle()
+                .single()
 
-            if (error && error.code !== 'PGRST116') {
-                throw error
-            }
+            if (error) {
+                if (error.code === '42P01') {
+                    // Table doesn't exist error
+                    toast.error('Profile system is not set up properly. Please contact support.')
+                    return
+                }
 
-            // If no profile exists, create one
-            if (!data) {
+                // If profile doesn't exist, create it
                 const newProfile = {
                     id: user.id,
+                    full_name: '',
                     username: user.user_metadata?.username || '',
+                    avatar_url: '',
+                    bio: '',
                     updated_at: new Date().toISOString()
                 }
 
                 const { error: insertError } = await supabase
                     .from('profiles')
-                    .insert([newProfile])
+                    .upsert([newProfile])
 
-                if (insertError) throw insertError
+                if (insertError) {
+                    console.error('Error creating profile:', insertError)
+                    toast.error('Error creating profile. Please try again.')
+                    return
+                }
 
                 data = newProfile
             }
 
-            // Update form data
-            setFormData({
-                username: data.username || user.user_metadata?.username || '',
-                website: data.website || '',
-                avatar_url: data.avatar_url || ''
-            })
+            if (data) {
+                setFormData({
+                    full_name: data.full_name || '',
+                    username: data.username || user.user_metadata?.username || '',
+                    avatar_url: data.avatar_url || '',
+                    bio: data.bio || ''
+                })
+            }
         } catch (error) {
-            console.error('Error fetching profile:', error)
-            toast.error('Error loading profile')
+            console.error('Error in profile operation:', error)
+            toast.error('Error loading profile. Please try again.')
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function createProfilesTable() {
+        try {
+            // This requires Supabase database access. You'll need to create the table
+            // through the Supabase dashboard or using database migrations.
+            toast.error('Please create the profiles table in your Supabase dashboard')
+        } catch (error) {
+            console.error('Error creating profiles table:', error)
         }
     }
 
@@ -74,7 +98,6 @@ export default function Profile() {
         try {
             setSaving(true)
 
-            // Validate username
             if (!formData.username.trim()) {
                 toast.error('Username is required')
                 return
@@ -82,17 +105,16 @@ export default function Profile() {
 
             const updates = {
                 id: user.id,
+                full_name: formData.full_name.trim(),
                 username: formData.username.trim(),
-                website: formData.website.trim(),
                 avatar_url: formData.avatar_url,
+                bio: formData.bio.trim(),
                 updated_at: new Date().toISOString()
             }
 
             const { error } = await supabase
                 .from('profiles')
-                .upsert(updates, {
-                    returning: 'minimal'
-                })
+                .upsert(updates)
 
             if (error) throw error
 
@@ -112,6 +134,59 @@ export default function Profile() {
         }
     }
 
+    async function uploadAvatar(event) {
+        try {
+            setUploading(true)
+
+            if (!event.target.files || event.target.files.length === 0) {
+                throw new Error('You must select an image to upload.')
+            }
+
+            const file = event.target.files[0]
+            const fileExt = file.name.split('.').pop()
+            const filePath = `${user.id}-${Math.random()}.${fileExt}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file)
+
+            if (uploadError) {
+                throw uploadError
+            }
+
+            // Get public URL
+            const { data } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath)
+
+            // Update profile with new avatar URL
+            const updates = {
+                ...formData,
+                avatar_url: data.publicUrl,
+                id: user.id,
+                updated_at: new Date().toISOString()
+            }
+
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .upsert(updates)
+
+            if (updateError) throw updateError
+
+            setFormData(prev => ({
+                ...prev,
+                avatar_url: data.publicUrl
+            }))
+
+            toast.success('Avatar updated successfully!')
+        } catch (error) {
+            console.error('Error uploading avatar:', error)
+            toast.error(error.message || 'Error uploading avatar')
+        } finally {
+            setUploading(false)
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         await updateProfile()
@@ -123,6 +198,10 @@ export default function Profile() {
             ...prev,
             [name]: value
         }))
+    }
+
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click()
     }
 
     if (!user) return null
@@ -137,16 +216,102 @@ export default function Profile() {
 
     return (
         <div className="py-6">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
                 <div className="overflow-hidden bg-white dark:bg-gray-800 shadow sm:rounded-lg">
                     <div className="px-4 py-5 sm:px-6">
                         <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">Profile Settings</h3>
                         <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                            Update your profile information
+                            Manage your profile information and preferences
                         </p>
                     </div>
+
                     <div className="border-t border-gray-200 dark:border-gray-700">
                         <form onSubmit={handleSubmit} className="space-y-6 px-4 py-5 sm:p-6">
+                            {/* Profile Picture Section */}
+                            <div className="flex items-center space-x-6">
+                                <div className="flex-shrink-0">
+                                    <div className="relative">
+                                        {formData.avatar_url ? (
+                                            <img
+                                                className="h-24 w-24 rounded-full object-cover"
+                                                src={formData.avatar_url}
+                                                alt="Profile"
+                                            />
+                                        ) : (
+                                            <div className="h-24 w-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                                <UserCircleIcon className="h-12 w-12 text-gray-400" />
+                                            </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleAvatarClick}
+                                            disabled={uploading}
+                                            className="absolute bottom-0 right-0 rounded-full bg-white dark:bg-gray-700 p-1.5 shadow-sm border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                            <CameraIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </button>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={uploadAvatar}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                        {uploading ? 'Uploading...' : 'Profile Picture'}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        {uploading
+                                            ? 'Please wait while we upload your photo...'
+                                            : 'Click the camera icon to upload a new photo'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Full Name */}
+                            <div>
+                                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Full Name
+                                </label>
+                                <div className="mt-1">
+                                    <input
+                                        type="text"
+                                        name="full_name"
+                                        id="full_name"
+                                        className="input"
+                                        value={formData.full_name}
+                                        onChange={handleChange}
+                                        placeholder="Enter your full name"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Username */}
+                            <div>
+                                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Username
+                                </label>
+                                <div className="mt-1">
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        id="username"
+                                        className="input"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        required
+                                        minLength={3}
+                                        placeholder="Choose a unique username"
+                                    />
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">This is your public display name.</p>
+                            </div>
+
+                            {/* Email */}
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Email
@@ -164,42 +329,25 @@ export default function Profile() {
                                 <p className="mt-1 text-sm text-gray-500">Your email cannot be changed.</p>
                             </div>
 
+                            {/* Bio */}
                             <div>
-                                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Username
+                                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Bio
                                 </label>
                                 <div className="mt-1">
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        id="username"
+                                    <textarea
+                                        name="bio"
+                                        id="bio"
+                                        rows={3}
                                         className="input"
-                                        value={formData.username}
+                                        value={formData.bio}
                                         onChange={handleChange}
-                                        required
-                                        minLength={3}
-                                    />
-                                </div>
-                                <p className="mt-1 text-sm text-gray-500">This is your public display name.</p>
-                            </div>
-
-                            <div>
-                                <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Website
-                                </label>
-                                <div className="mt-1">
-                                    <input
-                                        type="url"
-                                        name="website"
-                                        id="website"
-                                        className="input"
-                                        value={formData.website}
-                                        onChange={handleChange}
-                                        placeholder="https://example.com"
+                                        placeholder="Tell us a little about yourself"
                                     />
                                 </div>
                             </div>
 
+                            {/* Action Buttons */}
                             <div className="flex justify-end gap-3">
                                 <button
                                     type="button"
