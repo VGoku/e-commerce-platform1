@@ -1,8 +1,8 @@
 import { Fragment } from 'react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon, ShoppingCartIcon, SunIcon, MoonIcon, UserCircleIcon } from '@heroicons/react/24/outline'
-import { Link } from 'react-router-dom'
-import useCartStore from '../stores/useCartStore'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCartStore } from '../stores/useCartStore'
 import useAuthStore from '../stores/useAuthStore'
 import useThemeStore from '../stores/useThemeStore'
 
@@ -11,10 +11,18 @@ function classNames(...classes) {
 }
 
 export default function Navigation() {
-    const cartItems = useCartStore((state) => state.items)
+    const navigate = useNavigate()
+    const items = useCartStore((state) => state.items)
+    const clearCart = useCartStore((state) => state.clearCart)
     const { user, signOut } = useAuthStore()
     const { theme, toggleTheme } = useThemeStore()
-    const cartItemsCount = cartItems.length
+    const cartItemsCount = items.length
+
+    const handleSignOut = async () => {
+        clearCart() // Clear the cart before signing out
+        await signOut()
+        navigate('/') // Use navigate instead of window.location
+    }
 
     const navigation = [
         { name: 'Home', href: '/', current: false },
@@ -79,7 +87,17 @@ export default function Navigation() {
                                     <Menu as="div" className="relative ml-4">
                                         <Menu.Button className="flex rounded-full bg-white dark:bg-gray-800 text-sm focus:outline-none">
                                             <span className="sr-only">Open user menu</span>
-                                            <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700" />
+                                            {user.user_metadata?.avatar_url ? (
+                                                <img
+                                                    className="h-8 w-8 rounded-full object-cover"
+                                                    src={user.user_metadata.avatar_url}
+                                                    alt={user.user_metadata?.username || user.email}
+                                                />
+                                            ) : (
+                                                <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                                    <UserCircleIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
+                                                </div>
+                                            )}
                                         </Menu.Button>
                                         <Transition
                                             as={Fragment}
@@ -124,11 +142,11 @@ export default function Navigation() {
                                                 <Menu.Item>
                                                     {({ active }) => (
                                                         <button
-                                                            onClick={signOut}
-                                                            className={`block w-full text-left px-4 py-2 text-sm ${active
-                                                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                                                : 'text-gray-700 dark:text-gray-200'
-                                                                }`}
+                                                            onClick={handleSignOut}
+                                                            className={classNames(
+                                                                active ? 'bg-gray-100 dark:bg-gray-700' : '',
+                                                                'block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200'
+                                                            )}
                                                         >
                                                             Sign out
                                                         </button>
@@ -138,30 +156,42 @@ export default function Navigation() {
                                         </Transition>
                                     </Menu>
                                 ) : (
-                                    <Link
-                                        to="/login"
-                                        className="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500"
-                                    >
-                                        Sign in
-                                    </Link>
+                                    <div className="flex items-center space-x-4">
+                                        <Link
+                                            to="/login"
+                                            className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200"
+                                        >
+                                            Sign in
+                                        </Link>
+                                        <Link
+                                            to="/register"
+                                            className="btn btn-primary"
+                                        >
+                                            Sign up
+                                        </Link>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
+                    {/* Mobile menu */}
                     <Disclosure.Panel className="sm:hidden">
                         <div className="space-y-1 pb-3 pt-2">
                             {navigation.map((item) => (
-                                <Link
+                                <Disclosure.Button
                                     key={item.name}
+                                    as={Link}
                                     to={item.href}
                                     className={classNames(
-                                        item.current ? 'bg-primary-50 dark:bg-gray-700 border-primary-500 text-primary-700 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200',
-                                        'block border-l-4 py-2 pl-3 pr-4 text-base font-medium'
+                                        item.current
+                                            ? 'bg-primary-50 border-primary-500 text-primary-700'
+                                            : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700',
+                                        'block pl-3 pr-4 py-2 border-l-4 text-base font-medium'
                                     )}
                                 >
                                     {item.name}
-                                </Link>
+                                </Disclosure.Button>
                             ))}
                         </div>
                     </Disclosure.Panel>

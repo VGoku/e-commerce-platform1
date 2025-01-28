@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../lib/supabaseClient'
+import { useCartStore } from './useCartStore'
 
 const useAuthStore = create(
     persist(
@@ -11,7 +12,7 @@ const useAuthStore = create(
 
             // Initialize the auth state
             initialize: async () => {
-                set({ loading: true })
+                set({ loading: true, error: null })
                 try {
                     const { data: { session }, error } = await supabase.auth.getSession()
                     if (error) throw error
@@ -46,8 +47,8 @@ const useAuthStore = create(
                     }
 
                     // Attempt to sign in
-                    const { data, error } = await supabase.auth.signInWithPassword({
-                        email: email.trim().toLowerCase(),
+                    const { data: { session }, error } = await supabase.auth.signInWithPassword({
+                        email: email.trim(),
                         password
                     })
 
@@ -58,11 +59,11 @@ const useAuthStore = create(
                         throw error
                     }
 
-                    if (!data?.session) {
-                        throw new Error('No session returned after successful login')
+                    if (!session) {
+                        throw new Error('No session returned after login')
                     }
 
-                    set({ user: data.session.user })
+                    set({ user: session.user })
                     return { success: true }
                 } catch (error) {
                     console.error('Sign in error:', error)
@@ -168,6 +169,8 @@ const useAuthStore = create(
                     const { error } = await supabase.auth.signOut()
                     if (error) throw error
                     set({ user: null })
+                    // Clear the cart when signing out
+                    useCartStore.getState().clearCart()
                     window.location.href = '/' // Redirect to home page
                 } catch (error) {
                     console.error('Sign out error:', error)

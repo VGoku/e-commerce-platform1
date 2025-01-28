@@ -15,6 +15,7 @@ export default function ProductDetail() {
     const { products, loading, error, fetchProducts } = useProductStore()
     const addItem = useCartStore((state) => state.addItem)
     const [selectedQuantity, setSelectedQuantity] = useState(1)
+    const user = useCartStore((state) => state.user)
 
     useEffect(() => {
         if (products.length === 0) {
@@ -24,7 +25,7 @@ export default function ProductDetail() {
 
     const handleAddToCart = (e) => {
         e.preventDefault()
-        addItem(product, selectedQuantity)
+        addItem(product, selectedQuantity, user?.id)
         toast.success('Added to cart!')
         navigate('/cart')
     }

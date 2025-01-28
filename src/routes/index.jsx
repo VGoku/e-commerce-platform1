@@ -7,6 +7,9 @@ import Login from '../pages/Login'
 import Register from '../pages/Register'
 import Profile from '../pages/Profile'
 import Dashboard from '../pages/Dashboard'
+import About from '../pages/About'
+import Contact from '../pages/Contact'
+import Checkout from '../pages/Checkout'
 import NotFound from '../pages/NotFound'
 import ProtectedRoute from '../components/ProtectedRoute'
 
@@ -15,34 +18,16 @@ export default function AppRoutes() {
         <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
             {/* Protected Routes */}
-            <Route
-                path="/products"
-                element={
-                    <ProtectedRoute>
-                        <Products />
-                    </ProtectedRoute>
-                }
-            />
-            <Route
-                path="/products/:id"
-                element={
-                    <ProtectedRoute>
-                        <ProductDetail />
-                    </ProtectedRoute>
-                }
-            />
-            <Route
-                path="/cart"
-                element={
-                    <ProtectedRoute>
-                        <Cart />
-                    </ProtectedRoute>
-                }
-            />
             <Route
                 path="/profile"
                 element={

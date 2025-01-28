@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
+import useBalanceStore from '../stores/useBalanceStore'
 import { ShoppingBagIcon, CreditCardIcon, UserCircleIcon, HeartIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
     const navigate = useNavigate()
     const { user } = useAuthStore()
+    const balance = useBalanceStore((state) => state.balance)
 
     useEffect(() => {
         if (!user) {
@@ -14,10 +16,10 @@ export default function Dashboard() {
     }, [user, navigate])
 
     const stats = [
+        { name: 'Available Balance', value: `$${balance.toFixed(2)}`, icon: CreditCardIcon, color: 'bg-green-500' },
         { name: 'Total Orders', value: '0', icon: ShoppingBagIcon, color: 'bg-purple-500' },
-        { name: 'Total Spent', value: '$0.00', icon: CreditCardIcon, color: 'bg-pink-500' },
         { name: 'Wishlist Items', value: '0', icon: HeartIcon, color: 'bg-blue-500' },
-        { name: 'Member Since', value: new Date(user?.created_at).toLocaleDateString(), icon: UserCircleIcon, color: 'bg-green-500' },
+        { name: 'Member Since', value: new Date(user?.created_at).toLocaleDateString(), icon: UserCircleIcon, color: 'bg-pink-500' },
     ]
 
     const recentlyViewed = [

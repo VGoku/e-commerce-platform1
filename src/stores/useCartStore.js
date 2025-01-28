@@ -14,24 +14,24 @@ const useCartStore = create(
                                 item.id === product.id
                                     ? { ...item, quantity: item.quantity + quantity }
                                     : item
-                            ),
+                            )
                         }
                     }
                     return {
-                        items: [...state.items, { ...product, quantity }],
+                        items: [...state.items, { ...product, quantity }]
                     }
                 })
             },
             removeItem: (productId) => {
                 set((state) => ({
-                    items: state.items.filter((item) => item.id !== productId),
+                    items: state.items.filter((item) => item.id !== productId)
                 }))
             },
             updateQuantity: (productId, quantity) => {
                 set((state) => ({
                     items: state.items.map((item) =>
                         item.id === productId ? { ...item, quantity } : item
-                    ),
+                    )
                 }))
             },
             clearCart: () => {
@@ -44,11 +44,15 @@ const useCartStore = create(
                     0
                 )
             },
+            getCurrentUserItems: () => {
+                return get().items
+            }
         }),
         {
-            name: 'cart-storage',
+            name: 'cart-storage'
         }
     )
 )
 
+export { useCartStore }
 export default useCartStore 
