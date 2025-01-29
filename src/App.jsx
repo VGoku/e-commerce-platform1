@@ -1,7 +1,17 @@
 import { useEffect } from 'react'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Navigation from './components/Navigation'
-import AppRoutes from './routes'
+import Home from './pages/Home'
+import Products from './pages/Products'
+import ProductDetail from './pages/ProductDetail'
+import Cart from './pages/Cart'
+import Checkout from './pages/Checkout'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Dashboard from './pages/Dashboard'
+import WishlistView from './pages/WishlistView'
+import About from './pages/About'
+import Contact from './pages/Contact'
 import { Toaster } from 'react-hot-toast'
 import useThemeStore from './stores/useThemeStore'
 import useAuthStore from './stores/useAuthStore'
@@ -20,15 +30,27 @@ function App() {
     }, [theme, initialize])
 
     return (
-        <BrowserRouter>
+        <Router>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <Navigation />
-                <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-                    <AppRoutes />
-                </main>
                 <Toaster position="top-right" />
+                <main className="container mx-auto px-4 py-8">
+                    <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/products" element={<Products />} />
+                        <Route path="/products/:id" element={<ProductDetail />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/wishlist" element={<WishlistView />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/contact" element={<Contact />} />
+                    </Routes>
+                </main>
             </div>
-        </BrowserRouter>
+        </Router>
     )
 }
 

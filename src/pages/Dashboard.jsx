@@ -2,13 +2,18 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
 import useBalanceStore from '../stores/useBalanceStore'
+import useQuoteStore from '../stores/useQuoteStore'
+import useActivityStore from '../stores/useActivityStore'
 import { ShoppingBagIcon, CreditCardIcon, UserCircleIcon, HeartIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
     const navigate = useNavigate()
     const { user } = useAuthStore()
     const getBalance = useBalanceStore((state) => state.getBalance)
+    const getDailyQuote = useQuoteStore((state) => state.getDailyQuote)
+    const { getOrders, getWishlist, getRecentlyViewed } = useActivityStore()
     const balance = getBalance()
+    const quote = getDailyQuote()
 
     useEffect(() => {
         if (!user) {
@@ -16,15 +21,21 @@ export default function Dashboard() {
         }
     }, [user, navigate])
 
+    const orders = user ? getOrders(user.id) : []
+    const wishlistItems = user ? getWishlist(user.id) : []
+    const recentlyViewed = user ? getRecentlyViewed(user.id) : []
+
     const stats = [
         { name: 'Available Balance', value: `$${balance.toFixed(2)}`, icon: CreditCardIcon, color: 'bg-green-500' },
-        { name: 'Total Orders', value: '0', icon: ShoppingBagIcon, color: 'bg-purple-500' },
-        { name: 'Wishlist Items', value: '0', icon: HeartIcon, color: 'bg-blue-500' },
+        { name: 'Total Orders', value: orders.length.toString(), icon: ShoppingBagIcon, color: 'bg-purple-500' },
+        {
+            name: 'Wishlist Items',
+            value: wishlistItems.length.toString(),
+            icon: HeartIcon,
+            color: 'bg-blue-500',
+            onClick: () => navigate('/wishlist')
+        },
         { name: 'Member Since', value: new Date(user?.created_at).toLocaleDateString(), icon: UserCircleIcon, color: 'bg-pink-500' },
-    ]
-
-    const recentlyViewed = [
-        { name: 'No items viewed yet', price: '', image: '' }
     ]
 
     if (!user) return null
@@ -32,7 +43,7 @@ export default function Dashboard() {
     return (
         <div className="py-6">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                {/* Welcome Banner */}
+                {/* Welcome Banner with Quote */}
                 <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 shadow-lg">
                     <div className="absolute inset-0 bg-grid-white/10"></div>
                     <div className="relative p-8">
@@ -42,6 +53,12 @@ export default function Dashboard() {
                         <p className="mt-2 text-lg text-white/90">
                             Here's what's happening with your account today.
                         </p>
+                        {quote && (
+                            <div className="mt-6 p-4 bg-white/10 rounded-lg backdrop-blur-sm">
+                                <p className="text-white/90 italic">"{quote.text}"</p>
+                                <p className="mt-2 text-white/80 text-sm">— {quote.author}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -50,7 +67,9 @@ export default function Dashboard() {
                     {stats.map((item) => (
                         <div
                             key={item.name}
-                            className="relative overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 py-5 shadow-md transition-transform hover:scale-105 sm:px-6"
+                            className={`relative overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 py-5 shadow-md transition-transform hover:scale-105 sm:px-6 ${item.onClick ? 'cursor-pointer' : ''
+                                }`}
+                            onClick={item.onClick}
                         >
                             <dt>
                                 <div className={`absolute rounded-md ${item.color} p-3`}>
@@ -76,9 +95,30 @@ export default function Dashboard() {
                             </h2>
                         </div>
                         <div className="space-y-4">
-                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                No recent activity to show
-                            </div>
+                            {orders.length > 0 ? (
+                                orders.slice(0, 5).map((order, index) => (
+                                    <div key={index} className="flex items-center space-x-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg">
+                                        <ShoppingBagIcon className="h-8 w-8 text-purple-500" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                Order #{order.id}
+                                            </p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                {new Date(order.date).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div className="ml-auto">
+                                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                                ${order.total.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                    No recent activity to show
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -91,11 +131,38 @@ export default function Dashboard() {
                             </h2>
                         </div>
                         <div className="space-y-4">
-                            {recentlyViewed.map((item, index) => (
-                                <div key={index} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                    {item.name}
+                            {recentlyViewed.length > 0 ? (
+                                recentlyViewed.map((product) => (
+                                    <div
+                                        key={product.id}
+                                        className="flex items-center space-x-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                                        onClick={() => navigate(`/products/${product.id}`)}
+                                    >
+                                        <div className="flex-shrink-0 h-12 w-12">
+                                            <img
+                                                src={product.image}
+                                                alt={product.title}
+                                                className="h-full w-full object-cover rounded-md"
+                                                onError={(e) => {
+                                                    e.target.src = 'https://placehold.co/400x400/png?text=Product+Image'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                                {product.title}
+                                            </p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                ${product.price.toFixed(2)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                    No items viewed yet
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
                 </div>

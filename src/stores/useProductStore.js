@@ -14,13 +14,14 @@ const useProductStore = create((set, get) => ({
             if (!response.ok) throw new Error('Failed to fetch products')
             const data = await response.json()
 
-            // Transform the data to ensure image URLs are properly formatted
-            const transformedData = data.map(product => ({
+            // Map the data and provide fallback images
+            const productsWithFallback = data.map(product => ({
                 ...product,
-                image: product.image || 'https://placehold.co/400x400/png?text=Product+Image'
+                image: product.image || 'https://placehold.co/400x400/png?text=Product+Image',
+                fallbackImage: 'https://placehold.co/400x400/png?text=Product+Image'
             }))
 
-            set({ products: transformedData, loading: false })
+            set({ products: productsWithFallback, loading: false })
         } catch (error) {
             console.error('Error fetching products:', error)
             set({ error: error.message, loading: false })
@@ -28,17 +29,9 @@ const useProductStore = create((set, get) => ({
     },
 
     // Get a single product
-    getProduct: async (id) => {
-        const product = get().products.find(p => p.id === id)
-        if (product) return { success: true, data: product }
-
-        try {
-            const { data, error } = await getProduct(id)
-            if (error) throw error
-            return { success: true, data }
-        } catch (error) {
-            return { success: false, error: error.message }
-        }
+    getProduct: (id) => {
+        const products = get().products
+        return products.find(p => p.id === parseInt(id))
     },
 
     // Add a new product

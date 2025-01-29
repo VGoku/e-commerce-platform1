@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { StarIcon } from '@heroicons/react/20/solid'
+import { StarIcon, ShoppingCartIcon } from '@heroicons/react/20/solid'
+import { HeartIcon } from '@heroicons/react/24/outline'
+import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid'
 import useProductStore from '../stores/useProductStore'
 import useCartStore from '../stores/useCartStore'
+import useAuthStore from '../stores/useAuthStore'
+import useActivityStore from '../stores/useActivityStore'
+import ProductReviews from '../components/ProductReviews'
 import toast from 'react-hot-toast'
 
 function classNames(...classes) {
@@ -14,6 +19,8 @@ export default function ProductDetail() {
     const navigate = useNavigate()
     const { products, loading, error, fetchProducts } = useProductStore()
     const addItem = useCartStore((state) => state.addItem)
+    const { user } = useAuthStore()
+    const { addToRecentlyViewed, addToWishlist, removeFromWishlist, getWishlist } = useActivityStore()
     const [selectedQuantity, setSelectedQuantity] = useState(1)
     const [imageLoaded, setImageLoaded] = useState(false)
 
@@ -23,15 +30,53 @@ export default function ProductDetail() {
         }
     }, [fetchProducts, products.length])
 
+    const product = products.find(p => p.id === parseInt(id))
+    const wishlistItems = user ? getWishlist(user.id) : []
+    const isInWishlist = wishlistItems.some(item => item.id === parseInt(id))
+
+    useEffect(() => {
+        if (user && product) {
+            addToRecentlyViewed(user.id, product)
+        }
+    }, [user, product, addToRecentlyViewed])
+
     const handleAddToCart = (e) => {
         e.preventDefault()
         const productToAdd = {
-            ...product,
-            image: product.image
+            id: product.id,
+            title: product.title,
+            price: product.price,
+            image: product.image,
+            quantity: selectedQuantity
         }
-        addItem(productToAdd, selectedQuantity)
+
+        if (!user) {
+            // Store the product in session storage before redirecting
+            sessionStorage.setItem('pendingCartItem', JSON.stringify(productToAdd))
+            toast.error('Please sign in to add items to cart')
+            navigate('/login', { state: { from: `/products/${id}` } })
+            return
+        }
+
+        addItem(productToAdd)
         toast.success('Added to cart!')
         navigate('/cart')
+    }
+
+    const toggleWishlist = () => {
+        if (!user) {
+            toast.error('Please sign in to add items to wishlist')
+            navigate('/login', { state: { from: `/products/${id}` } })
+            return
+        }
+
+        if (isInWishlist) {
+            removeFromWishlist(user.id, product.id)
+            toast.success('Removed from wishlist')
+        } else {
+            addToWishlist(user.id, product)
+            toast.success('Added to wishlist')
+        }
     }
 
     if (loading) {
@@ -50,8 +95,6 @@ export default function ProductDetail() {
         )
     }
 
-    const product = products.find(p => p.id === parseInt(id))
-
     if (!product) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -61,7 +104,7 @@ export default function ProductDetail() {
     }
 
     return (
-        <div className="bg-white">
+        <div className="bg-white dark:bg-gray-900">
             <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24 lg:max-w-7xl lg:px-8">
                 <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
                     {/* Image gallery */}
@@ -76,8 +119,7 @@ export default function ProductDetail() {
                                 <img
                                     src={product.image}
                                     alt={product.title}
-                                    className={`h-full w-full object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
-                                        }`}
+                                    className={`h-full w-full object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                                     onLoad={() => setImageLoaded(true)}
                                     onError={(e) => {
                                         console.log('Image failed to load:', product.image)
@@ -91,11 +133,23 @@ export default function ProductDetail() {
 
                     {/* Product info */}
                     <div className="mt-10 px-4 sm:mt-16 sm:px-0 lg:mt-0">
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">{product.title}</h1>
+                        <div className="flex justify-between items-start">
+                            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{product.title}</h1>
+                            <button
+                                onClick={toggleWishlist}
+                                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                                {isInWishlist ? (
+                                    <HeartSolid className="h-6 w-6 text-red-500" />
+                                ) : (
+                                    <HeartIcon className="h-6 w-6 text-gray-400 hover:text-red-500" />
+                                )}
+                            </button>
+                        </div>
 
                         <div className="mt-3">
                             <h2 className="sr-only">Product information</h2>
-                            <p className="text-3xl tracking-tight text-gray-900">${product.price.toFixed(2)}</p>
+                            <p className="text-3xl tracking-tight text-gray-900 dark:text-white">${product.price.toFixed(2)}</p>
                         </div>
 
                         {/* Reviews */}
@@ -122,14 +176,14 @@ export default function ProductDetail() {
 
                         <div className="mt-6">
                             <h3 className="sr-only">Description</h3>
-                            <p className="text-base text-gray-900">{product.description}</p>
+                            <p className="text-base text-gray-900 dark:text-gray-300">{product.description}</p>
                         </div>
 
                         <form className="mt-6" onSubmit={handleAddToCart}>
                             {/* Quantity */}
                             <div className="mt-8">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-medium text-gray-900">Quantity</h3>
+                                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-300">Quantity</h3>
                                 </div>
 
                                 <div className="mt-2">
@@ -151,10 +205,16 @@ export default function ProductDetail() {
                                 type="submit"
                                 className="mt-8 flex w-full items-center justify-center btn btn-primary"
                             >
+                                <ShoppingCartIcon className="h-5 w-5 mr-2" />
                                 Add to cart
                             </button>
                         </form>
                     </div>
+                </div>
+
+                {/* Reviews Section */}
+                <div className="mt-16">
+                    <ProductReviews productId={product.id} />
                 </div>
             </div>
         </div>
