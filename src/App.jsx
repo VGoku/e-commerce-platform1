@@ -8,10 +8,12 @@ import Cart from './pages/Cart'
 import Checkout from './pages/Checkout'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Profile from './pages/Profile'
 import Dashboard from './pages/Dashboard'
 import WishlistView from './pages/WishlistView'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import Footer from './components/Footer'
 import { Toaster } from 'react-hot-toast'
 import useThemeStore from './stores/useThemeStore'
 import useAuthStore from './stores/useAuthStore'
@@ -43,12 +45,14 @@ function App() {
                         <Route path="/checkout" element={<Checkout />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/profile" element={<Profile />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/wishlist" element={<WishlistView />} />
                         <Route path="/about" element={<About />} />
                         <Route path="/contact" element={<Contact />} />
                     </Routes>
                 </main>
+                <Footer />
             </div>
         </Router>
     )
