@@ -7,7 +7,8 @@ import { ShoppingBagIcon, CreditCardIcon, UserCircleIcon, HeartIcon, ClockIcon, 
 export default function Dashboard() {
     const navigate = useNavigate()
     const { user } = useAuthStore()
-    const balance = useBalanceStore((state) => state.balance)
+    const getBalance = useBalanceStore((state) => state.getBalance)
+    const balance = getBalance()
 
     useEffect(() => {
         if (!user) {

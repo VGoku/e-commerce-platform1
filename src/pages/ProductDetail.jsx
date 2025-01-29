@@ -15,7 +15,7 @@ export default function ProductDetail() {
     const { products, loading, error, fetchProducts } = useProductStore()
     const addItem = useCartStore((state) => state.addItem)
     const [selectedQuantity, setSelectedQuantity] = useState(1)
-    const user = useCartStore((state) => state.user)
+    const [imageLoaded, setImageLoaded] = useState(false)
 
     useEffect(() => {
         if (products.length === 0) {
@@ -25,7 +25,11 @@ export default function ProductDetail() {
 
     const handleAddToCart = (e) => {
         e.preventDefault()
-        addItem(product, selectedQuantity, user?.id)
+        const productToAdd = {
+            ...product,
+            image: product.image
+        }
+        addItem(productToAdd, selectedQuantity)
         toast.success('Added to cart!')
         navigate('/cart')
     }
@@ -63,11 +67,25 @@ export default function ProductDetail() {
                     {/* Image gallery */}
                     <div className="flex flex-col-reverse">
                         <div className="aspect-h-1 aspect-w-1 w-full">
-                            <img
-                                src={product.image}
-                                alt={product.title}
-                                className="h-full w-full object-contain object-center"
-                            />
+                            <div className="relative h-full w-full rounded-lg border border-gray-200 bg-white p-4">
+                                {!imageLoaded && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                                        <div className="text-gray-400">Loading image...</div>
+                                    </div>
+                                )}
+                                <img
+                                    src={product.image}
+                                    alt={product.title}
+                                    className={`h-full w-full object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                                        }`}
+                                    onLoad={() => setImageLoaded(true)}
+                                    onError={(e) => {
+                                        console.log('Image failed to load:', product.image)
+                                        e.target.src = 'https://placehold.co/400x400/png?text=Product+Image'
+                                        setImageLoaded(true)
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
 

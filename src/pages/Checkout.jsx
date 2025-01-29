@@ -1,22 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../stores/useCartStore'
 import useAuthStore from '../stores/useAuthStore'
 import useBalanceStore from '../stores/useBalanceStore'
 import toast from 'react-hot-toast'
 
-const INITIAL_BALANCE = 1000
-
 export default function Checkout() {
     const navigate = useNavigate()
     const { user } = useAuthStore()
-    const { items, getTotal, clearCart } = useCartStore()
-    const { balance, deductBalance } = useBalanceStore()
+    const { getCurrentUserItems, getTotal, clearCart } = useCartStore()
+    const { getBalance, deductBalance } = useBalanceStore()
+
+    const items = getCurrentUserItems()
+    const [imageLoadStates, setImageLoadStates] = useState({})
     const subtotal = getTotal()
     const shipping = items.length > 0 ? 5.00 : 0
     const tax = subtotal * 0.1
     const total = subtotal + shipping + tax
-    const [balanceState] = useState(INITIAL_BALANCE)
+    const balance = getBalance()
 
     const [formData, setFormData] = useState({
         email: user?.email || '',
@@ -48,19 +49,31 @@ export default function Checkout() {
 
         // Simulate order processing
         toast.promise(
-            new Promise((resolve) => setTimeout(resolve, 2000)),
-            {
-                loading: 'Processing your order...',
-                success: () => {
+            new Promise((resolve) => setTimeout(resolve, 2000))
+                .then(() => {
                     deductBalance(total)
                     clearCart()
                     navigate('/dashboard', { replace: true })
-                    return 'Thank you for your order! Your package is on the way. 🚚'
-                },
+                }),
+            {
+                loading: 'Processing your order...',
+                success: 'Thank you for your order! Your package is on the way. 🚚',
                 error: 'Something went wrong. Please try again.',
             }
         )
     }
+
+    const handleImageLoad = (itemId) => {
+        setImageLoadStates(prev => ({
+            ...prev,
+            [itemId]: true
+        }))
+    }
+
+    // Debug log to check item data
+    useEffect(() => {
+        console.log('Checkout items:', items)
+    }, [items])
 
     if (items.length === 0) {
         return (
@@ -267,14 +280,22 @@ export default function Checkout() {
                                 <ul className="divide-y divide-gray-200">
                                     {items.map((item) => (
                                         <li key={item.id} className="flex py-6">
-                                            <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200 bg-white">
+                                            <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
+                                                {!imageLoadStates[item.id] && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                                                        <div className="text-gray-400 text-xs">Loading...</div>
+                                                    </div>
+                                                )}
                                                 <img
                                                     src={item.image}
                                                     alt={item.title}
-                                                    className="h-full w-full object-contain object-center"
+                                                    className={`h-full w-full object-contain object-center transition-opacity duration-300 ${imageLoadStates[item.id] ? 'opacity-100' : 'opacity-0'
+                                                        }`}
+                                                    onLoad={() => handleImageLoad(item.id)}
                                                     onError={(e) => {
-                                                        e.target.src = 'https://via.placeholder.com/150'
-                                                        e.target.onerror = null
+                                                        console.log('Image failed to load:', item.image)
+                                                        e.target.src = 'https://placehold.co/200x200/png?text=Product+Image'
+                                                        handleImageLoad(item.id)
                                                     }}
                                                 />
                                             </div>

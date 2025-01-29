@@ -10,15 +10,20 @@ const useProductStore = create((set, get) => ({
     fetchProducts: async () => {
         set({ loading: true, error: null })
         try {
-            const { data, error } = await getProducts()
-            if (error) throw error
-            set({ products: data })
-            return { success: true, data }
+            const response = await fetch('https://fakestoreapi.com/products')
+            if (!response.ok) throw new Error('Failed to fetch products')
+            const data = await response.json()
+
+            // Transform the data to ensure image URLs are properly formatted
+            const transformedData = data.map(product => ({
+                ...product,
+                image: product.image || 'https://placehold.co/400x400/png?text=Product+Image'
+            }))
+
+            set({ products: transformedData, loading: false })
         } catch (error) {
-            set({ error: error.message })
-            return { success: false, error: error.message }
-        } finally {
-            set({ loading: false })
+            console.error('Error fetching products:', error)
+            set({ error: error.message, loading: false })
         }
     },
 

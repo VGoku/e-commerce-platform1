@@ -1,13 +1,28 @@
 import { Link } from 'react-router-dom'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import { useCartStore } from '../stores/useCartStore'
+import { useEffect, useState } from 'react'
 
 export default function Cart() {
-    const { items, removeItem, updateQuantity, getTotal } = useCartStore()
+    const { getCurrentUserItems, removeItem, updateQuantity, getTotal } = useCartStore()
+    const items = getCurrentUserItems()
     const subtotal = getTotal()
     const shipping = items.length > 0 ? 5.00 : 0
     const tax = subtotal * 0.1
     const total = subtotal + shipping + tax
+    const [imageLoadStates, setImageLoadStates] = useState({})
+
+    // Debug log to check item data
+    useEffect(() => {
+        console.log('Cart items:', items)
+    }, [items])
+
+    const handleImageLoad = (itemId) => {
+        setImageLoadStates(prev => ({
+            ...prev,
+            [itemId]: true
+        }))
+    }
 
     const handleUpdateQuantity = (productId, quantity) => {
         updateQuantity(productId, quantity)
@@ -44,71 +59,70 @@ export default function Cart() {
                     <div>
                         <h2 className="sr-only">Items in your shopping cart</h2>
 
-                        <ul className="divide-y divide-gray-200 border-b border-t border-gray-200">
-                            {items.map((item) => (
-                                <li key={item.id} className="flex py-6">
-                                    <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
-                                        <div className="absolute inset-0 bg-white">
+                        <div className="flow-root">
+                            <ul role="list" className="-my-6 divide-y divide-gray-200">
+                                {items.map((item) => (
+                                    <li key={item.id} className="flex py-6">
+                                        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
+                                            {!imageLoadStates[item.id] && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                                                    <div className="text-gray-400 text-xs">Loading...</div>
+                                                </div>
+                                            )}
                                             <img
                                                 src={item.image}
                                                 alt={item.title}
-                                                className="h-full w-full object-contain"
+                                                className={`h-full w-full object-contain object-center transition-opacity duration-300 ${imageLoadStates[item.id] ? 'opacity-100' : 'opacity-0'
+                                                    }`}
+                                                onLoad={() => handleImageLoad(item.id)}
                                                 onError={(e) => {
-                                                    e.target.src = 'https://via.placeholder.com/150'
-                                                    e.target.onerror = null
+                                                    console.log('Image failed to load:', item.image)
+                                                    e.target.src = 'https://placehold.co/200x200/png?text=Product+Image'
+                                                    handleImageLoad(item.id)
                                                 }}
                                             />
                                         </div>
-                                    </div>
 
-                                    <div className="ml-4 flex flex-1 flex-col sm:ml-6">
-                                        <div>
-                                            <div className="flex justify-between">
-                                                <h4 className="text-sm">
-                                                    <Link to={`/products/${item.id}`} className="font-medium text-gray-700 hover:text-gray-800 dark:text-gray-200 dark:hover:text-white">
-                                                        {item.title}
-                                                    </Link>
-                                                </h4>
-                                                <p className="ml-4 text-sm font-medium text-gray-900 dark:text-gray-200">
-                                                    ${(item.price * item.quantity).toFixed(2)}
-                                                </p>
+                                        <div className="ml-4 flex flex-1 flex-col">
+                                            <div>
+                                                <div className="flex justify-between text-base font-medium text-gray-900">
+                                                    <h3>
+                                                        <Link to={`/product/${item.id}`}>{item.title}</Link>
+                                                    </h3>
+                                                    <p className="ml-4">${(item.price * item.quantity).toFixed(2)}</p>
+                                                </div>
                                             </div>
-                                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                ${item.price.toFixed(2)} each
-                                            </p>
-                                        </div>
-
-                                        <div className="mt-4 flex flex-1 items-end justify-between">
-                                            <div className="flex items-center space-x-2">
-                                                <label htmlFor={`quantity-${item.id}`} className="sr-only">
-                                                    Quantity
-                                                </label>
-                                                <select
-                                                    id={`quantity-${item.id}`}
-                                                    name={`quantity-${item.id}`}
-                                                    className="input max-w-[80px] dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                                    value={item.quantity}
-                                                    onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value))}
-                                                >
-                                                    {[1, 2, 3, 4, 5].map((num) => (
-                                                        <option key={num} value={num}>
-                                                            {num}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                            <div className="flex flex-1 items-end justify-between text-sm">
+                                                <div className="flex items-center space-x-2">
+                                                    <label htmlFor={`quantity-${item.id}`} className="text-gray-500">
+                                                        Qty
+                                                    </label>
+                                                    <select
+                                                        id={`quantity-${item.id}`}
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value))}
+                                                        className="rounded-md border border-gray-300 text-base"
+                                                    >
+                                                        {[...Array(10)].map((_, i) => (
+                                                            <option key={i + 1} value={i + 1}>
+                                                                {i + 1}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                                 <button
                                                     type="button"
-                                                    className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
                                                     onClick={() => handleRemoveItem(item.id)}
+                                                    className="font-medium text-indigo-600 hover:text-indigo-500"
                                                 >
-                                                    <TrashIcon className="h-5 w-5" />
+                                                    Remove
                                                 </button>
                                             </div>
                                         </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     </div>
 
                     {/* Order summary */}
