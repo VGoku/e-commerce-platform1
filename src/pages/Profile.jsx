@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline'
 import useAuthStore from '../stores/useAuthStore'
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Profile() {
@@ -14,7 +14,7 @@ export default function Profile() {
     const fileInputRef = useRef(null)
     const [formData, setFormData] = useState({
         full_name: '',
-        username: user?.user_metadata?.username || '',
+        username: '',
         avatar_url: '',
         bio: ''
     })
@@ -30,45 +30,41 @@ export default function Profile() {
     async function fetchProfile() {
         try {
             setLoading(true)
+            console.log('Fetching profile for user:', user.id)
 
-            // First, try to get the existing profile
-            let { data, error } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
-                .select('full_name, username, avatar_url, bio')
+                .select('*')
                 .eq('id', user.id)
                 .single()
 
             if (error) {
-                if (error.code === '42P01') {
-                    // Table doesn't exist error
-                    toast.error('Profile system is not set up properly. Please contact support.')
-                    return
+                console.error('Error fetching profile:', error)
+                if (error.code === 'PGRST116') {
+                    // Profile doesn't exist, create it
+                    const newProfile = {
+                        id: user.id,
+                        full_name: '',
+                        username: user.user_metadata?.username || '',
+                        avatar_url: '',
+                        bio: '',
+                        updated_at: new Date().toISOString()
+                    }
+
+                    const { error: insertError } = await supabase
+                        .from('profiles')
+                        .insert([newProfile])
+
+                    if (insertError) {
+                        throw insertError
+                    }
+
+                    setFormData(newProfile)
+                } else {
+                    throw error
                 }
-
-                // If profile doesn't exist, create it
-                const newProfile = {
-                    id: user.id,
-                    full_name: '',
-                    username: user.user_metadata?.username || '',
-                    avatar_url: '',
-                    bio: '',
-                    updated_at: new Date().toISOString()
-                }
-
-                const { error: insertError } = await supabase
-                    .from('profiles')
-                    .upsert([newProfile])
-
-                if (insertError) {
-                    console.error('Error creating profile:', insertError)
-                    toast.error('Error creating profile. Please try again.')
-                    return
-                }
-
-                data = newProfile
-            }
-
-            if (data) {
+            } else if (data) {
+                console.log('Profile data received:', data)
                 setFormData({
                     full_name: data.full_name || '',
                     username: data.username || user.user_metadata?.username || '',
@@ -84,19 +80,10 @@ export default function Profile() {
         }
     }
 
-    async function createProfilesTable() {
-        try {
-            // This requires Supabase database access. You'll need to create the table
-            // through the Supabase dashboard or using database migrations.
-            toast.error('Please create the profiles table in your Supabase dashboard')
-        } catch (error) {
-            console.error('Error creating profiles table:', error)
-        }
-    }
-
     async function updateProfile() {
         try {
             setSaving(true)
+            console.log('Updating profile for user:', user.id)
 
             if (!formData.username.trim()) {
                 toast.error('Username is required')
@@ -112,13 +99,15 @@ export default function Profile() {
                 updated_at: new Date().toISOString()
             }
 
+            console.log('Sending profile updates:', updates)
+
             const { error } = await supabase
                 .from('profiles')
                 .upsert(updates)
 
             if (error) throw error
 
-            // Update the username in auth metadata as well
+            // Update the username in auth metadata
             const { error: metadataError } = await supabase.auth.updateUser({
                 data: { username: formData.username.trim() }
             })
@@ -126,6 +115,7 @@ export default function Profile() {
             if (metadataError) throw metadataError
 
             toast.success('Profile updated successfully!')
+            await fetchProfile() // Refresh the profile data
         } catch (error) {
             console.error('Error updating profile:', error)
             toast.error(error.message || 'Error updating profile')
