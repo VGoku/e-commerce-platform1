@@ -1,19 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Direct configuration without environment variables
+const supabaseUrl = 'https://jqhgqhgsgczaigagjiur.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxaGdxaGdzZ2N6YWlnYWdqaXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc2NjU4MzgsImV4cCI6MjA1MzI0MTgzOH0.b_skL62L0XuYfetX4mtddE3fr0_iCsPztOsFYXMLGq8'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables')
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
-    }
-})
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Auth helper functions
 export const signUp = async (email, password) => {
@@ -48,7 +39,7 @@ export const getProducts = async () => {
         .from('products')
         .select('*')
         .order('id', { ascending: false })
-    
+
     if (error) throw error
     return data
 }
@@ -59,7 +50,7 @@ export const getProduct = async (id) => {
         .select('*')
         .eq('id', id)
         .single()
-    
+
     if (error) throw error
     return data
 }
@@ -69,7 +60,7 @@ export const createProduct = async (product) => {
         .from('products')
         .insert([product])
         .select()
-    
+
     if (error) throw error
     return data
 }
@@ -80,7 +71,7 @@ export const updateProduct = async (id, updates) => {
         .update(updates)
         .eq('id', id)
         .select()
-    
+
     if (error) throw error
     return data
 }
@@ -90,7 +81,7 @@ export const deleteProduct = async (id) => {
         .from('products')
         .delete()
         .eq('id', id)
-    
+
     if (error) throw error
     return true
 }
@@ -101,7 +92,7 @@ export const createOrder = async (order) => {
         .from('orders')
         .insert([order])
         .select()
-    
+
     if (error) throw error
     return data
 }
@@ -118,7 +109,7 @@ export const getOrders = async (userId) => {
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-    
+
     if (error) throw error
     return data
 }
@@ -129,7 +120,7 @@ export const addToWishlist = async (userId, productId) => {
         .from('wishlist_items')
         .insert([{ user_id: userId, product_id: productId }])
         .select()
-    
+
     if (error) throw error
     return data
 }
@@ -140,7 +131,7 @@ export const removeFromWishlist = async (userId, productId) => {
         .delete()
         .eq('user_id', userId)
         .eq('product_id', productId)
-    
+
     if (error) throw error
     return true
 }
@@ -153,7 +144,7 @@ export const getWishlist = async (userId) => {
             product:products (*)
         `)
         .eq('user_id', userId)
-    
+
     if (error) throw error
     return data
 }
